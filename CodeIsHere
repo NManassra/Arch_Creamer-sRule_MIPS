@@ -1,0 +1,1225 @@
+.data
+newline: .asciiz "\n"                    # Newline for printing
+space: .asciiz " "                       # Space for formatting
+cont:  .space 2
+int_buffer: .space 4 
+var_x:     .asciiz "x"
+var_y:     .asciiz "y"
+var_z:     .asciiz "z"
+system:    .asciiz "System "
+points:    .asciiz ":"
+m_sign:    .asciiz "-"
+p_sign:    .asciiz "+"
+equal_sign: .asciiz " = "
+div_sign:   .asciiz "/"
+x_is:	.asciiz "X = "
+y_is:	.asciiz "Y = "
+z_is:	.asciiz "Z = "
+temp_buffer: .space 16
+num_of_systems: 	.byte 0
+err_div_zero:	.asciiz "Error division by zero!\n"
+# Arrays to store coefficients, results, and types, each with 10 slots (1 byte per slot)
+coeff_x: .space 30                       # Array for x coefficients (10 slots, 1 byte each)
+coeff_y: .space 30                       # Array for y coefficients (10 slots, 1 byte each)
+coeff_z: .space 30                       # Array for z coefficients (10 slots, 1 byte each)
+results: .space 30                       # Array for equation results (10 slots, 1 byte each)
+types: .space 30                         # Array to store equation types (10 slots, 1 byte each)
+
+buffer: .space 500                       # Buffer to hold each line of text
+err_reading_file:	.asciiz "Error reading the file"
+file_prompt:    .asciiz "Please enter the input file name: "
+choice_prompt:  .asciiz "Press (f/F) to save result in a file or (s/S) to print on the screen: "
+continue:	    .asciiz "Do you want to continue (Y/n): "
+filename:       .space 64                     # Allocate space for the filename
+fileflag:	    .space 2
+outfilename:    .space 64
+outfileprompt:  .asciiz "Please enter the output file name: "
+err_choice:     .asciiz "Your choice can't be determined, exiting...\n"
+
+.text
+.globl main
+
+main:
+    # Print the file prompt
+    li $v0, 4                                 # Syscall for print string
+    la $a0, file_prompt                       # Load address of the file prompt
+    syscall
+
+    # Read file name input from user
+    li $v0, 8                                 # Syscall for reading a string
+    la $a0, filename                          # Buffer to store the filename
+    li $a1, 64                                # Maximum number of characters to read
+    syscall
+
+    # Trim newline from filename input
+    la $t0, filename                          # Load starting address of filename
+trim_whitespace:
+    lb $t1, 0($t0)                            # Load byte at address $t0
+    beq $t1, 0, open_file                     # If we reach null terminator, skip trimming
+    beq $t1, 10, set_null                     # If we reach newline character (ASCII 10), trim it
+    addi $t0, $t0, 1                          # Move to the next byte
+    j trim_whitespace
+
+set_null:
+    sb $zero, 0($t0)                          # Set current position to null terminator
+
+open_file:
+    # Open file
+    li $v0, 13                                # Syscall for open file
+    la $a0, filename                          # Load trimmed file name
+    li $a1, 0                                 # Read mode
+    li $a2, 0                                 # Default permission (not used in read mode)
+    syscall
+    move $s0, $v0                             # Store file descriptor in $s0
+
+    # Check if file opened successfully
+    bltz $s0, file_error                      # If file descriptor < 0, go to error
+    # Load base addresses of arrays into $s registers for storing coefficients
+    la $s1, coeff_x                       # Load base address of coeff_x
+    la $s2, coeff_y                       # Load base address of coeff_y
+    la $s3, coeff_z                       # Load base address of coeff_z
+    la $s4, results                       # Load base address of results
+    la $s5, types                         # Load base address of types
+
+read_file:
+    # Read a line from file
+    li $v0, 14                            # Syscall for read file
+    move $a0, $s0                         # File descriptor
+    la $a1, buffer                        # Load address of buffer into $a1
+    li $a2, 500                           # Max characters to read
+    syscall
+    
+    # Parse line if read was successful
+    jal parse_coefficients                # Parse buffer to extract coefficients
+
+close_file:
+    # Close the file
+    li $v0, 16                            # Syscall for close file
+    move $a0, $s0                         # File descriptor
+    syscall
+
+    la $a0, choice_prompt
+    li $v0, 4
+    syscall
+    
+    la $a0, fileflag
+    li $a1, 2
+    li $v0, 8
+    syscall
+    
+    lb $t0, fileflag
+    beq $t0, 'f', file_out
+    beq $t0, 'F', file_out
+    beq $t0, 's', screen_out
+    beq $t0, 'S', screen_out
+    j choice_error
+    
+file_out:
+    li $t0, 1                           
+    la $t1, fileflag
+    sb $t0, 0($t1)                        
+    
+    la $a0, newline
+    li $v0, 4
+    syscall
+    
+    la $a0, outfileprompt
+    syscall 
+
+    la $a0, outfilename                    
+    li $a1, 64                           
+    li $v0, 8                             
+    syscall
+
+    # Trim newline from output file name
+    la $t2, outfilename                     # Load starting address of outfilename
+trim_output_filename:
+    lb $t3, 0($t2)                          # Load byte at address $t2
+    beq $t3, 0, open_output_file            # If null terminator is reached, go to open file
+    beq $t3, 10, set_null_1                   # If newline is reached (ASCII 10), trim it
+    addi $t2, $t2, 1                        # Move to the next character
+    j trim_output_filename                  # Continue loop
+
+set_null_1:
+    sb $zero, 0($t2)                        # Replace newline with null terminator
+
+open_output_file:
+
+    li $v0, 13                           
+    la $a0, outfilename                  
+    li $a1, 9                            
+    li $a2, 420                      
+    syscall
+    move $a3, $v0                 
+    bltz $a3, file_error      
+
+    jal solve_systems
+    
+ask_to_continue:
+
+    la $a0, continue
+    li $v0, 4
+    syscall
+    
+    la $a0, cont
+    li $a1, 2
+    li $v0, 8
+    syscall
+    
+    la $a0, cont
+    lb $t0, 0($a0)
+    beq $t0, 'n', exit_program
+    beq $t0, 'N', exit_program    
+    
+
+infinite_loop:
+clear_num_of_systems:
+    la $t1, num_of_systems
+    sb $zero, 0($t1)
+
+
+clear_coefficients:
+    li $t0, 30
+    la $t1, coeff_x
+clear_coeff_x_loop:
+    beqz $t0, clear_coeff_y
+    sb $zero, 0($t1)
+    addiu $t1, $t1, 1
+    addiu $t0, $t0, -1
+    j clear_coeff_x_loop
+
+clear_coeff_y:
+    li $t0, 30
+    la $t1, coeff_y
+clear_coeff_y_loop:
+    beqz $t0, clear_coeff_z
+    sb $zero, 0($t1)
+    addiu $t1, $t1, 1
+    addiu $t0, $t0, -1
+    j clear_coeff_y_loop
+
+clear_coeff_z:
+    li $t0, 30
+    la $t1, coeff_z
+clear_coeff_z_loop:
+    beqz $t0, clear_results
+    sb $zero, 0($t1)
+    addiu $t1, $t1, 1
+    addiu $t0, $t0, -1
+    j clear_coeff_z_loop
+
+clear_results:
+    li $t0, 30
+    la $t1, results
+clear_results_loop:
+    beqz $t0, clear_types
+    sb $zero, 0($t1)
+    addiu $t1, $t1, 1
+    addiu $t0, $t0, -1
+    j clear_results_loop
+
+clear_types:
+    li $t0, 30
+    la $t1, types
+clear_types_loop:
+    beqz $t0, clear_filename
+    sb $zero, 0($t1)
+    addiu $t1, $t1, 1
+    addiu $t0, $t0, -1
+    j clear_types_loop
+
+clear_filename:
+    # Clear filename (64 bytes)
+    li $t0, 64
+    la $t1, filename
+clear_filename_loop:
+    beqz $t0, clear_fileflag
+    sb $zero, 0($t1)
+    addiu $t1, $t1, 1
+    addiu $t0, $t0, -1
+    j clear_filename_loop
+
+clear_fileflag:
+    li $t0, 2
+    la $t1, fileflag
+clear_fileflag_loop:
+    beqz $t0, main
+    sb $zero, 0($t1)
+    addiu $t1, $t1, 1
+    addiu $t0, $t0, -1
+    j clear_fileflag_loop    
+            
+    j main
+
+    
+screen_out:   
+    
+    jal solve_systems
+    
+    
+    j exit_program
+    
+division_by_zero_error:
+    la $a0, err_div_zero
+    li $v0, 4
+    syscall
+    
+exit_program:
+    li $v0, 10                            # Syscall for exit
+    syscall
+
+file_error:
+
+    li $v0, 4                                
+    la $a0, newline                         
+    syscall
+    la $a0, err_reading_file       
+    syscall
+    j exit_program          
+
+choice_error:
+
+    li $v0, 4                            
+    la $a0, newline                    
+    syscall
+    la $a0, err_choice            
+    syscall
+    j exit_program                     
+
+
+parse_coefficients:
+    la $t8, buffer                        # Load address of buffer into $t8
+
+    li $t3, 1                             # Default coefficient for x
+    li $t4, 1                             # Default coefficient for y
+    li $t5, 1                             # Default coefficient for z
+    li $t6, 0                             # Result (right side of equation)
+    li $t7, 1                             # Sign for the current coefficient
+    lb $a0, num_of_systems
+    addiu $a0, $a0, 1
+    sb $a0, num_of_systems
+    j parse_loop
+
+new_system:
+   lb $a0, num_of_systems
+   addiu $a0, $a0, 1
+   sb $a0, num_of_systems
+   addiu $s5, $s5, 1
+   xor $t2, $t2, $t2
+   addiu $t8, $t8, 2
+   li $t7, 1
+   
+parse_loop:
+    lb $t9, 0($t8)                        # Load the next character from buffer
+    beqz $t9, store_result                # If end of line, store result
+    
+    li $s0, 0xd
+    beq $t9, $s0, store_result
+    
+    # Check for '+' or '-' to adjust the sign
+    li $s0, '+'                           # ASCII for '+'
+    beq $t9, $s0, set_positive
+
+    li $s0, '-'                           # ASCII for '-'
+    beq $t9, $s0, set_negative
+    
+    # Parse variables x, y, z and assign coefficients
+    li $s0, 'x'                           # ASCII for 'x'
+    beq $t9, $s0, store_x
+
+    li $s0, 'y'                           # ASCII for 'y'
+    beq $t9, $s0, store_y
+
+    li $s0, 'z'                           # ASCII for 'z'
+    beq $t9, $s0, store_z
+
+    li $s0, '='                           # ASCII for '='
+    beq $t9, $s0, set_result_mode
+    
+    # Check if character is a digit
+    li $s0, '0'
+    bge $t9, $s0, check_digit_end
+
+    j parse_next_character                # Move to next character if not part of a term
+
+set_positive:
+    li $t7, 1                             # Set sign to positive
+    j parse_next_character
+
+set_negative:
+    li $t7, -1                            # Set sign to negative
+    j parse_next_character
+
+check_digit_end:
+    li $s0, '9'
+    ble $t9, $s0, process_digit
+
+    j parse_next_character                # Continue to next character if not a valid digit
+
+process_digit:
+    sub $t9, $t9, '0'                     # Convert ASCII to integer
+    mul $t2, $t2, 10                      # Shift previous value in $t2 by multiplying by 10
+    add $t2, $t2, $t9                     # Add the new digit to $t2
+    mul $t2, $t2, $t7                     # Apply sign to the result in $t2
+    j parse_next_character                # Continue to the next character
+
+set_default_value:
+    li $t2, 1
+set_default_t2:
+    beqz $t2, set_default_value
+jr $ra
+
+# Store each coefficient upon finding a variable
+store_x:
+    move $s7, $ra
+    jal set_default_t2
+    move $ra, $s7
+    move $t3, $t2                         # Store x coefficient
+    sb $t3, 0($s1)                        # Save in x coefficient array
+    addi $s1, $s1, 1                      # Move to next slot in coeff_x
+    li $t2, 1                             # Reset coefficient to default 1
+    li $t7, 1                             # Reset sign to positive
+    xor $t2, $t2, $t2
+    j parse_next_character
+
+store_y:
+    move $s7, $ra
+    jal set_default_t2
+    move $ra, $s7
+    move $t4, $t2                         # Store y coefficient
+    sb $t4, 0($s2)                        # Save in y coefficient array
+    addi $s2, $s2, 1                      # Move to next slot in coeff_y
+    li $t2, 1                             # Reset coefficient to default 1
+    li $t7, 1                             # Reset sign to positive
+    xor $t2, $t2, $t2
+    j parse_next_character
+
+store_z:
+    move $s7, $ra
+    jal set_default_t2
+    move $ra, $s7
+    move $t5, $t2                         # Store z coefficient
+    sb $t5, 0($s3)                        # Save in z coefficient array
+    addi $s3, $s3, 1                      # Move to next slot in coeff_z
+    li $t2, 1                             # Reset coefficient to default 1
+    li $t7, 1                             # Reset sign to positive
+    xor $t2, $t2, $t2
+    li $s0, 1
+    sb $s0, 0($s5)
+    j parse_next_character
+
+set_result_mode:
+    li $t7, 1                             # Reset sign to positive for result parsing
+    xor $t2, $t2, $t2
+    j parse_next_character
+
+parse_next_character:
+    addi $t8, $t8, 1                      # Move to the next character in buffer
+    j parse_loop                          # Continue parsing the line
+
+see_what_to_do: 
+    addi $t8, $t8, 1
+    lb $t9, 0($t8)
+    beq $t9, 0xd, new_system
+    bnez $t9, parse_loop
+    jr $ra
+    
+store_result:
+    move $t5, $t2
+    sb $t5, 0($s4)                        # Store result in results array
+    addi $s4, $s4, 1                      # Move to next slot in results
+    xor $t2, $t2, $t2
+    addi $t8, $t8, 1
+    lb $t9, 0($t8)
+    beq $t9, 0xa, see_what_to_do
+    jr $ra                                # Return
+
+print_equations:
+    la $s1, coeff_x                       # Reset base address for coeff_x
+    la $s2, coeff_y                       # Reset base address for coeff_y
+    la $s3, coeff_z                       # Reset base address for coeff_z
+    la $s4, results                       # Reset base address for results
+    la $s5, types                         # Reset base address for types
+    
+    li $t0, 1                             # Initialize system counter to 1
+    
+print_system:
+   lb $t1, num_of_systems
+   li $t2, 1
+   bgt $t0, $t1, print_done
+   lb $t1, 0($s5)
+   beqz $t1, print_2var_system
+   
+print_3var_system:
+   lb $a0, 0($s1)
+   li $v0, 1
+   syscall
+   la $a0, var_x
+   li $v0, 4
+   syscall
+   la $a0, space
+   syscall
+   la $a0, p_sign
+   syscall
+   la $a0, space
+   syscall
+   lb $a0, 0($s2)
+   li $v0, 1
+   syscall
+   la $a0, var_y
+   li $v0, 4
+   syscall
+   la $a0, space
+   syscall
+   la $a0, p_sign
+   syscall
+   la $a0, space
+   syscall
+   lb $a0, 0($s3)
+   li $v0, 1
+   syscall
+   la $a0, var_z
+   li $v0, 4
+   syscall
+   la $a0, equal_sign
+   syscall
+   lb $a0, 0($s4)
+   li $v0, 1
+   syscall
+   la $a0, newline
+   li $v0, 4
+   syscall
+    
+   addiu $s1, $s1, 1
+   addiu $s2, $s2, 1
+   addiu $s3, $s3, 1
+   addiu $s4, $s4, 1
+   beq $t2, 3, system_done
+   addiu $t2, $t2, 1
+   j print_3var_system
+   
+print_2var_system:  
+   lb $a0, 0($s1)
+   li $v0, 1
+   syscall
+   la $a0, var_x
+   li $v0, 4
+   syscall
+   la $a0, space
+   syscall
+   la $a0, p_sign
+   syscall
+   la $a0, space
+   syscall
+   lb $a0, 0($s2)
+   li $v0, 1
+   syscall
+   la $a0, var_y
+   li $v0, 4
+   syscall
+   la $a0, equal_sign
+   syscall
+   lb $a0, 0($s4)
+   li $v0, 1
+   syscall
+   la $a0, newline
+   li $v0, 4
+   syscall
+    
+   addiu $s1, $s1, 1
+   addiu $s2, $s2, 1
+   addiu $s4, $s4, 1
+   beq $t2, 2, system_done
+   addiu $t2, $t2, 1
+   j print_2var_system 
+
+system_done:
+    addiu $s5, $s5, 1
+    addiu $t0, $t0, 1
+    j print_system   
+   
+print_done:
+   jr $ra
+
+solve_systems:
+    la $a0, newline 
+    li $v0, 4
+    syscall
+    move $s0, $ra
+    la $s1, coeff_x
+    la $s2, coeff_y
+    la $s3, coeff_z
+    la $s4, results
+    la $s5, types
+    li $a1, 1
+    
+start_solving:  
+  
+    lb $t0, 0($s5)
+    beqz $t0, two_vars
+    
+three_vars:                  # det(A) in $t8 , det(A1) in $t9 , det(A2) in $s6 , det(A3) in $s7
+    jal solve_3var_system
+    move $ra, $s0
+    # here we will print the results
+    
+    beq $t8, $zero, division_by_zero_error
+    
+    lb $t0, fileflag
+    beq $t0, 1, three_vars_file
+    
+    la $a0, x_is
+    li $v0, 4
+    syscall
+    
+    move $t0, $t9
+    move $t1, $t8
+    jal print_div_value
+    move $ra, $s0
+    la $a0, newline
+    li $v0, 4
+    syscall
+    la $a0, y_is
+    li $v0, 4
+    syscall
+    
+    move $t0, $s6
+    move $t1, $t8
+    jal print_div_value
+    move $ra, $s0
+    la $a0, newline
+    li $v0, 4
+    syscall
+    la $a0, z_is
+    li $v0, 4
+    syscall
+    
+    move $t0, $s7
+    move $t1, $t8
+    jal print_div_value
+    move $ra, $s0
+    la $a0, newline
+    li $v0, 4
+    syscall
+    syscall
+    j done_three_vars
+ 
+three_vars_file:
+    move $v1, $a1
+    move $a0, $a3
+    la $a1, x_is
+    li $a2, 4
+    li $v0, 15
+    syscall
+    
+    move $t0, $t9
+    move $t1, $t8
+    jal print_div_value_to_file
+    move $ra, $s0
+    la $a1, newline
+    li $a2, 1
+    li $v0, 15
+    syscall
+    la $a1, y_is
+    li $a2, 4
+    li $v0, 15
+    syscall
+    
+    move $t0, $s6
+    move $t1, $t8
+    jal print_div_value_to_file
+    move $ra, $s0
+    la $a1, newline
+    li $a2, 1
+    li $v0, 15
+    syscall
+    la $a1, z_is
+    li $a2, 4
+    li $v0, 15
+    syscall
+    
+    move $t0, $s7
+    move $t1, $t8
+    jal print_div_value_to_file
+    move $ra, $s0
+    la $a1, newline
+    li $a2, 1
+    li $v0, 15
+    syscall
+    li $v0, 15
+    syscall
+     
+done_three_vars:
+    lb $a2, num_of_systems
+    move $a1, $v1
+    bgt $a1, $a2, solve_finished
+    addiu $a1, $a1, 1
+    addiu $s1, $s1, 3
+    addiu $s2, $s2, 3
+    addiu $s3, $s3, 3
+    addiu $s4, $s4, 3
+    addiu $s5, $s5, 1
+    j start_solving 
+       
+two_vars:		     # det(A) in $t4 , det(A1) in $t5 , det(A2) in $t6 	
+    jal solve_2var_system
+    move $ra, $s0
+    # here we will print the results
+    
+    beq $t4, $zero, division_by_zero_error
+    
+    lb $t0, fileflag
+    beq $t0, 1, two_vars_file
+    
+    la $a0, x_is
+    li $v0, 4
+    syscall
+    
+    move $t0, $t5
+    move $t1, $t4
+    jal print_div_value
+    move $ra, $s0
+    la $a0, newline
+    li $v0, 4
+    syscall
+    la $a0, y_is
+    li $v0, 4
+    syscall
+    
+    move $t0, $t6
+    move $t1, $t4
+    jal print_div_value
+    move $ra, $s0
+    la $a0, newline
+    li $v0, 4
+    syscall
+    syscall
+    j done_two_vars
+
+two_vars_file:
+    move $v1, $a1
+    move $a0, $a3
+    la $a1, x_is
+    li $a2, 4
+    li $v0, 15
+    syscall
+    
+    move $t0, $t5
+    move $t1, $t4
+    jal print_div_value_to_file
+    move $ra, $s0
+    move $a0, $a3
+    la $a1, newline
+    li $a2, 1
+    li $v0, 15
+    syscall
+    move $a0, $a3
+    la $a1, y_is
+    li $a2, 4
+    li $v0, 15
+    syscall
+    
+    move $t0, $t6
+    move $t1, $t4
+    jal print_div_value_to_file
+    move $ra, $s0
+    move $a0, $a3
+    la $a1, newline
+    li $a2, 1
+    li $v0, 15
+    syscall
+    li $v0, 15
+    syscall
+    
+    
+done_two_vars:     
+    lb $a2, num_of_systems
+    move $a1, $v1
+    bge $a1, $a2, solve_finished
+    addiu $a1, $a1, 1
+    addiu $s1, $s1, 2
+    addiu $s2, $s2, 2
+    addiu $s4, $s4, 2
+    addiu $s5, $s5, 1
+    j start_solving 
+ 
+solve_finished:
+    
+    jr $ra
+    
+
+solve_3var_system:
+    # calculate det(A) starts here
+    lb $t0, 1($s2)
+    lb $t1, 2($s3)
+    
+    mult $t0, $t1
+    
+    mflo $t2
+    
+    lb $t0, 1($s3)
+    lb $t1, 2($s2)
+    
+    mult $t0, $t1
+    
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s1)
+    mult $t0, $t4
+    mflo $t5       
+    
+    lb $t0, 1($s1)
+    lb $t1, 2($s3)
+    mult $t0, $t1
+    
+    mflo $t2
+    
+    lb $t0, 2($s1)
+    lb $t1, 1($s3)
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s2)
+    mult $t0, $t4
+    mflo $t6
+    
+    lb $t0, 1($s1)
+    lb $t1, 2($s2)
+    mult $t0, $t1
+    mflo $t2
+    
+    lb $t0, 2($s1)
+    lb $t1, 1($s2)
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s3)
+    mult $t0, $t4
+    
+    mflo $t7
+    
+    sub $t8, $t5, $t6
+    add $t8, $t8, $t7
+    
+    # now $t8 = det(A)
+
+    # calculation of det(A1), det(A2), det(A3)
+    lb $t0, 1($s2)
+    lb $t1, 2($s3)
+    
+    mult $t0, $t1
+    
+    mflo $t2
+    
+    lb $t0, 1($s3)
+    lb $t1, 2($s2)
+    
+    mult $t0, $t1
+    
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s4)
+    mult $t0, $t4
+    mflo $t5       
+    
+    lb $t0, 1($s4)
+    lb $t1, 2($s3)
+    mult $t0, $t1
+    
+    mflo $t2
+    
+    lb $t0, 2($s4)
+    lb $t1, 1($s3)
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s2)
+    mult $t0, $t4
+    mflo $t6
+    
+    lb $t0, 1($s4)
+    lb $t1, 2($s2)
+    mult $t0, $t1
+    mflo $t2
+    
+    lb $t0, 2($s4)
+    lb $t1, 1($s2)
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s3)
+    mult $t0, $t4
+    
+    mflo $t7
+    
+    sub $t9, $t5, $t6
+    add $t9, $t9, $t7 # Det(A1) in $t9
+    
+    # ------------------------------------------------
+    
+    lb $t0, 1($s4)
+    lb $t1, 2($s3)
+    
+    mult $t0, $t1
+    
+    mflo $t2
+    
+    lb $t0, 1($s3)
+    lb $t1, 2($s4)
+    
+    mult $t0, $t1
+    
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s1)
+    mult $t0, $t4
+    mflo $t5       
+    
+    lb $t0, 1($s1)
+    lb $t1, 2($s3)
+    mult $t0, $t1
+    
+    mflo $t2
+    
+    lb $t0, 2($s1)
+    lb $t1, 1($s3)
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s4)
+    mult $t0, $t4
+    mflo $t6
+    
+    lb $t0, 1($s1)
+    lb $t1, 2($s4)
+    mult $t0, $t1
+    mflo $t2
+    
+    lb $t0, 2($s1)
+    lb $t1, 1($s4)
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s3)
+    mult $t0, $t4
+    
+    mflo $t7
+    
+    sub $s6, $t5, $t6
+    add $s6, $s6, $t7 # Det(A2) in $s6
+   
+    # -----------------------------------
+    
+    lb $t0, 1($s2)
+    lb $t1, 2($s4)
+    
+    mult $t0, $t1
+    
+    mflo $t2
+    
+    lb $t0, 1($s4)
+    lb $t1, 2($s2)
+    
+    mult $t0, $t1
+    
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s1)
+    mult $t0, $t4
+    mflo $t5       
+    
+    lb $t0, 1($s1)
+    lb $t1, 2($s4)
+    mult $t0, $t1
+    
+    mflo $t2
+    
+    lb $t0, 2($s1)
+    lb $t1, 1($s4)
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s2)
+    mult $t0, $t4
+    mflo $t6
+    
+    lb $t0, 1($s1)
+    lb $t1, 2($s2)
+    mult $t0, $t1
+    mflo $t2
+    
+    lb $t0, 2($s1)
+    lb $t1, 1($s2)
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    lb $t0, 0($s4)
+    mult $t0, $t4
+    
+    mflo $t7
+    
+    sub $s7, $t5, $t6
+    add $s7, $s7, $t7
+    
+    # now $s7 = det(A3)
+  
+    jr $ra
+
+    
+solve_2var_system:
+    lb $t0, 0($s1)
+    lb $t1, 1($s2)
+    
+    mult $t0, $t1
+    mflo $t2
+    
+    lb $t0, 1($s1)
+    lb $t1, 0($s2)
+    
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t4, $t2, $t3
+    # now $t4 = det(A)
+
+    # calculation of det(A1), det(A2)
+    lb $t0, 0($s4)
+    lb $t1, 1($s2)
+    
+    mult $t0, $t1
+    mflo $t2
+    
+    lb $t0, 1($s4)
+    lb $t1, 0($s2)
+    
+    
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t5, $t2, $t3
+    
+    # ------------------------------------------------
+    
+    lb $t0, 0($s1)
+    lb $t1, 1($s4)
+    
+    mult $t0, $t1
+    mflo $t2
+    
+    lb $t0, 1($s1)
+    lb $t1, 0($s4)
+    
+    mult $t0, $t1
+    mflo $t3
+    
+    sub $t6, $t2, $t3
+    
+    jr $ra
+
+
+print_div_value_to_file:
+    div $t0, $t1   
+    mfhi $t2       
+    mflo $t3
+    beq $t2, $zero, integer_result_to_file 
+    j not_integer_result_to_file 
+
+integer_result_to_file:
+    move $a0, $t3
+    move $a2, $ra
+    la $a1, int_buffer
+    sb $zero, 0($a1)
+    jal int_to_ascii
+    move $ra, $a2
+    
+    la $t1, int_buffer                       
+    li $a2, 0                          
+find_length1:
+    lb $t2, 0($t1)                      
+    beq $t2, $zero, find_length1_done      
+    addi $a2, $a2, 1                     
+    addi $t1, $t1, 1                      
+    j find_length1
+    
+find_length1_done:
+    li $v0, 15                     
+    move $a0, $a3                       
+    la $a1, int_buffer                      
+    syscall                         
+    sb $zero, 0($a1)
+    jr $ra
+    
+not_integer_result_to_file:
+    move $t7, $ra
+    jal gcd 
+    move $ra, $t7
+    move $t7, $v0
+    div $t1, $v0
+    mflo $k0
+    div $t0, $v0
+    mflo $a0
+    la $a1, int_buffer
+    sb $zero, 0($a1)
+    move $a2, $ra
+    jal int_to_ascii
+    move $ra, $a2
+    la $t1, int_buffer                       
+    li $a2, 0                          
+find_length2:
+    lb $t2, 0($t1)                      
+    beq $t2, $zero, find_length2_done      
+    addi $a2, $a2, 1                     
+    addi $t1, $t1, 1                      
+    j find_length2
+    
+find_length2_done:
+    li $v0, 15                     
+    move $a0, $a3                       
+    la $a1, int_buffer                      
+    syscall                         
+    
+    move $a0, $a3
+    la $a1, div_sign
+    li $a2, 1
+    li $v0, 15
+    syscall
+    
+    move $a0, $k0
+    move $a2, $ra
+    la $a1, int_buffer
+    sb $zero, 0($a1)
+    jal int_to_ascii
+    move $ra, $a2
+    
+    la $t1, int_buffer                       
+    li $a2, 0                          
+find_length3:
+    lb $t2, 0($t1)                      
+    beq $t2, $zero, find_length3_done      
+    addi $a2, $a2, 1                     
+    addi $t1, $t1, 1                      
+    j find_length3
+    
+find_length3_done:
+    li $v0, 15                     
+    move $a0, $a3                       
+    la $a1, int_buffer                      
+    syscall                         
+    jr $ra                   
+
+int_to_ascii:
+    addi $sp, $sp, -16                  
+    sw $t1, 4($sp)                   
+    sw $t2, 8($sp)                   
+    sw $t3, 12($sp)                     
+
+    move $t1, $a0                        
+    la $t2, int_buffer                     
+
+    beq $t1, $zero, handle_zero
+
+int_to_string_loop:
+    li $a0, 10
+    div $t1, $a0
+    mfhi $a0                          
+    addi $a0, $a0, 48                 
+    sb $a0, 0($t2)                   
+    addi $t2, $t2, 1                  
+
+    mflo $t1                             
+    bnez $t1, int_to_string_loop        
+
+    j int_to_string_done
+
+handle_zero:
+    li $a0, 48                           
+    sb $a0, 0($t2)                       
+    addi $t2, $t2, 1                  
+
+int_to_string_done:
+    sb $zero, 0($t2)                     
+
+    la $t3, buffer                   
+    subi $t2, $t2, 1                      
+reverse_string:
+    bge $t3, $t2, end_reverse            
+    lb $a0, 0($t3)                       
+    lb $a1, 0($t2)                       
+    sb $a1, 0($t3)                        
+    sb $a0, 0($t2)
+    addi $t3, $t3, 1                    
+    subi $t2, $t2, 1                     
+    j reverse_string
+
+end_reverse:
+    lw $t1, 4($sp)                       
+    lw $t2, 8($sp)                        
+    lw $t3, 12($sp)                       
+    addi $sp, $sp, 16                    
+    jr $ra                               
+
+
+
+print_div_value:
+    div $t0, $t1   
+    mfhi $t2       
+    mflo $t3
+    beq $t2, $zero, integer_result 
+    j not_integer_result 
+
+integer_result:
+    move $a0, $t3
+    li $v0, 1
+    syscall
+    jr $ra
+    
+not_integer_result:
+    move $t7, $ra
+    jal gcd 
+    move $ra, $t7
+    move $t7, $v0
+    div $t0, $v0
+    mflo $a0
+    li $v0, 1
+    syscall
+    
+    la $a0, div_sign
+    li $v0, 4
+    syscall
+    
+    move $v0, $t7
+    div $t1, $v0
+    mflo $a0
+    li $v0, 1
+    syscall
+    jr $ra                          
+ 
+
+gcd:
+    move $t4, $t0          # Copy number 1 to $t4
+    move $t5, $t1          # Copy number 2 to $t5
+
+gcd_loop:
+    beq $t5, 0, gcd_done   # If $t5 is 0, GCD is in $t4
+
+    div $t4, $t5           # Divide $t4 by $t5
+    mfhi $t6               # Store the remainder in $t6
+    move $t4, $t5          # Move $t5 to $t4 (new a = b)
+    move $t5, $t6          # Move remainder to $t5 (new b = remainder)
+    j gcd_loop             # Repeat the loop
+
+gcd_done:
+    move $v0, $t4          # GCD result in $v0
+    jr $ra                 # Return to caller                   
