@@ -333,9 +333,9 @@ parse_systems:
     li $t9, 0                              # Reset system counter
     la $s0, coeff_array_x                  # Initialize pointer to coefficient x array
     la $s7, coeff_array_y                  # Initialize pointer to coefficient y array
-    la $s3, coeff_array_z                  # Initialize pointer to coefficient z array
+    la $s5, coeff_array_z                  # Initialize pointer to coefficient z array
     la $s4, results_array                  # Initialize pointer to results array
-    la $s5, system_type_array              # Initialize pointer to system types array
+    la $s3, system_type_array              # Initialize pointer to system types array
     li $t0, 0                              # Reset equation counter
     xor $t1, $t1, $t1                      # Clear z_read flag
     lb $t8, 0($a0)
@@ -372,7 +372,7 @@ check_line_feed:
     bne $t8, $t7, format_error             # If not 0xA, invalid line break
 
 handle_new_system:
-    addi $s5, $s5, 1                       # Advance system type pointer
+    addi $s3, $s3, 1                       # Advance system type pointer
     li $t0, 0                              # Reset equation counter
     lb $t9, system_counter                 # Load current system counter
     addi $t9, $t9, 1                       # Increment system counter
@@ -543,21 +543,21 @@ validate_store:
     j store_three_var                      # If z is present, it's a 3-variable system
 
 store_two_var:
-    sb $zero, 0($s5)                       # Store system type as 0 (2-variable)
+    sb $zero, 0($s3)                       # Store system type as 0 (2-variable)
     j store_coefficients
 
 store_three_var:
     li $t8, 1                              # System type for 3-variable system
-    sb $t8, 0($s5)                         # Store system type as 1 (3-variable)
+    sb $t8, 0($s3)                         # Store system type as 1 (3-variable)
     
 store_coefficients:
     sb $t3, 0($s0)                         # Store x coefficient
     sb $t4, 0($s7)                         # Store y coefficient
-    sb $t5, 0($s3)                         # Store z coefficient
+    sb $t5, 0($s5)                         # Store z coefficient
     sb $t6, 0($s4)                         # Store result
     addi $s0, $s0, 1                       # Advance x array pointer
     addi $s7, $s7, 1                       # Advance y array pointer
-    addi $s3, $s3, 1                       # Advance z array pointer
+    addi $s5, $s5, 1                       # Advance z array pointer
     addi $s4, $s4, 1                       # Advance results array pointer
     jr $ra                                 # Return to caller
     
@@ -730,15 +730,15 @@ solve_systems:
     la $s1, coeff_array_x                  # Initialize pointer to coefficient x array
     la $s0, coeff_array_y                  # Initialize pointer to coefficient y array
     la $s7, coeff_array_z                  # Initialize pointer to coefficient z array
-    la $s3, results_array                  # Initialize pointer to results array
+    la $s5, results_array                  # Initialize pointer to results array
     la $s4, system_type_array              # Initialize pointer to system types array
     la $a1, output_buffer
-    li $s5, 0
+    li $s3, 0
 check_system:
     
     lb $k1, system_counter
-    bge $s5, $k1, solving_done
-    addiu $s5, $s5, 1
+    bge $s3, $k1, solving_done
+    addiu $s3, $s3, 1
     
     lb $t0, 0($s4)
     beq $t0, 0, solve_two_vars
@@ -751,8 +751,8 @@ solve_three_vars:
     sw $v0, det_a
     
     move $t0, $s1
-    move $s1, $s3
-    move $s3, $t0
+    move $s1, $s5
+    move $s5, $t0
     
     jal determinant_3x3     # find det(A1)
     move $ra, $k0
@@ -760,12 +760,12 @@ solve_three_vars:
     sw $v0, det_a1
     
     move $t0, $s1
-    move $s1, $s3
-    move $s3, $t0
+    move $s1, $s5
+    move $s5, $t0
     
     move $t0, $s0
-    move $s0, $s3
-    move $s3, $t0
+    move $s0, $s5
+    move $s5, $t0
     
     jal determinant_3x3    # find det(A2)
     move $ra, $k0
@@ -773,12 +773,12 @@ solve_three_vars:
     sw $v0, det_a2
     
     move $t0, $s0
-    move $s0, $s3
-    move $s3, $t0
+    move $s0, $s5
+    move $s5, $t0
     
     move $t0, $s7
-    move $s7, $s3
-    move $s3, $t0
+    move $s7, $s5
+    move $s5, $t0
     
     jal determinant_3x3
     move $ra, $k0
@@ -786,8 +786,8 @@ solve_three_vars:
     sw $v0, det_a3
     
     move $t0, $s7
-    move $s7, $s3
-    move $s3, $t0
+    move $s7, $s5
+    move $s5, $t0
     
     jal extract_three_var_answers
     move $ra, $k0
@@ -795,7 +795,7 @@ solve_three_vars:
     addiu $s1, $s1, 3
     addiu $s0, $s0, 3
     addiu $s7, $s7, 3
-    addiu $s3, $s3, 3
+    addiu $s5, $s5, 3
     addiu $s4, $s4, 1
     
     j check_system
@@ -808,8 +808,8 @@ solve_two_vars:
     sw $v0, det_a
     
     move $t0, $s1
-    move $s1, $s3
-    move $s3, $t0
+    move $s1, $s5
+    move $s5, $t0
     
     jal determinant_2x2   # find det(A1)
     move $ra, $k0
@@ -817,12 +817,12 @@ solve_two_vars:
     sw $v0, det_a1
     
     move $t0, $s1
-    move $s1, $s3
-    move $s3, $t0
+    move $s1, $s5
+    move $s5, $t0
     
     move $t0, $s0
-    move $s0, $s3
-    move $s3, $t0
+    move $s0, $s5
+    move $s5, $t0
     
     jal determinant_2x2    # find det(A2)
     move $ra, $k0
@@ -830,8 +830,8 @@ solve_two_vars:
     sw $v0, det_a2
     
     move $t0, $s0
-    move $s0, $s3
-    move $s3, $t0
+    move $s0, $s5
+    move $s5, $t0
     
     jal extract_two_var_answers
     move $ra, $k0
@@ -839,7 +839,7 @@ solve_two_vars:
     addiu $s1, $s1, 2
     addiu $s0, $s0, 2
     addiu $s7, $s7, 2
-    addiu $s3, $s3, 2
+    addiu $s5, $s5, 2
     addiu $s4, $s4, 1
     j check_system
 
