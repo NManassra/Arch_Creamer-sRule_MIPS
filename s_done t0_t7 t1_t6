@@ -103,35 +103,35 @@ display_menu:
     
     # Process the user menu choice
     lb $t7, menu_choice                       # Load the user's choice into $t7
-    li $t1, '1'                               # ASCII code for '1'
-    beq $t7, $t1, handle_read_input           # If choice is '1', go to file reading section
+    li $t6, '1'                               # ASCII code for '1'
+    beq $t7, $t6, handle_read_input           # If choice is '1', go to file reading section
 
-    li $t1, '2'                               # ASCII code for '2'
-    beq $t7, $t1, handle_output_file          # If choice is '2', go to output to file handling
+    li $t6, '2'                               # ASCII code for '2'
+    beq $t7, $t6, handle_output_file          # If choice is '2', go to output to file handling
 
-    li $t1, 'f'                               # ASCII for lowercase 'f'
-    beq $t7, $t1, handle_output_file          # If choice is 'f', handle file output
+    li $t6, 'f'                               # ASCII for lowercase 'f'
+    beq $t7, $t6, handle_output_file          # If choice is 'f', handle file output
 
-    li $t1, 'F'                               # ASCII for uppercase 'F'
-    beq $t7, $t1, handle_output_file          # If choice is 'F', handle file output
+    li $t6, 'F'                               # ASCII for uppercase 'F'
+    beq $t7, $t6, handle_output_file          # If choice is 'F', handle file output
 
-    li $t1, '3'                               # ASCII code for '3'
-    beq $t7, $t1, handle_screen_output        # If choice is '3', handle screen output
+    li $t6, '3'                               # ASCII code for '3'
+    beq $t7, $t6, handle_screen_output        # If choice is '3', handle screen output
 
-    li $t1, 's'                               # ASCII for lowercase 's'
-    beq $t7, $t1, handle_screen_output        # If choice is 's', handle screen output
+    li $t6, 's'                               # ASCII for lowercase 's'
+    beq $t7, $t6, handle_screen_output        # If choice is 's', handle screen output
 
-    li $t1, 'S'                               # ASCII for uppercase 'S'
-    beq $t7, $t1, handle_screen_output        # If choice is 'S', handle screen output
+    li $t6, 'S'                               # ASCII for uppercase 'S'
+    beq $t7, $t6, handle_screen_output        # If choice is 'S', handle screen output
 
-    li $t1, '4'                               # ASCII code for '4'
-    beq $t7, $t1, handle_exit_program         # If choice is '4', handle program exit
+    li $t6, '4'                               # ASCII code for '4'
+    beq $t7, $t6, handle_exit_program         # If choice is '4', handle program exit
 
-    li $t1, 'e'                               # ASCII for lowercase 'e'
-    beq $t7, $t1, handle_exit_program         # If choice is 'e', handle program exit
+    li $t6, 'e'                               # ASCII for lowercase 'e'
+    beq $t7, $t6, handle_exit_program         # If choice is 'e', handle program exit
 
-    li $t1, 'E'                               # ASCII for uppercase 'E'
-    beq $t7, $t1, handle_exit_program         # If choice is 'E', handle program exit
+    li $t6, 'E'                               # ASCII for uppercase 'E'
+    beq $t7, $t6, handle_exit_program         # If choice is 'E', handle program exit
 
     # If choice is invalid, print an error and redisplay the menu
     li $v0, 4                                 # Syscall for print string
@@ -255,17 +255,17 @@ trim_newline:
     add $t7, $zero, $a0            # Copy the address of the string to $t7 for traversal
 
 trim_loop:
-    lb $t1, 0($t7)                 # Load the current character
-    beq $t1, 0, end_trim           # If we reach the null terminator, we're done
+    lb $t6, 0($t7)                 # Load the current character
+    beq $t6, 0, end_trim           # If we reach the null terminator, we're done
     addi $t7, $t7, 1               # Move to the next character
     j trim_loop                    # Repeat until we reach the end of the string
 
 # Backtrack to remove the newline character
 end_trim:
     addi $t7, $t7, -1              # Go back one position to the last character
-    lb $t1, 0($t7)                 # Load the last character
+    lb $t6, 0($t7)                 # Load the last character
     li $t2, 10                     # ASCII value for newline character
-    bne $t1, $t2, trim_done        # If it's not a newline, we're done
+    bne $t6, $t2, trim_done        # If it's not a newline, we're done
     sb $zero, 0($t7)               # Replace newline with null terminator if found
 
 trim_done:
@@ -337,7 +337,7 @@ parse_systems:
     la $s4, results_array                  # Initialize pointer to results array
     la $s5, system_type_array              # Initialize pointer to system types array
     li $t7, 0                              # Reset equation counter
-    xor $t1, $t1, $t1                      # Clear z_read flag
+    xor $t6, $t6, $t6                      # Clear z_read flag
     lb $t8, 0($a0)
     beqz $t8, parse_end
     lb $t9, system_counter                 # Load current system counter
@@ -399,7 +399,7 @@ validate_and_parse_line:
     li $t3, 0                              # Coefficient for x
     li $t4, 0                              # Coefficient for y
     li $t5, 0                              # Coefficient for z
-    li $t6, 0                              # Result (right-hand side of equation)
+    li $t1, 0                              # Result (right-hand side of equation)
     li $t0, 1                              # Default sign positive
     xor $t2, $t2, $t2                      # Clear current coefficient accumulator
 
@@ -529,7 +529,7 @@ next_term:
     j parse_terms
 
 validate_store:
-    mul $t6, $t2, $t0
+    mul $t1, $t2, $t0
     # Validate that x and y are present
     lb $t8, x_read
     beqz $t8, format_error                 # If x is missing, format error
@@ -554,7 +554,7 @@ store_coefficients:
     sb $t3, 0($s1)                         # Store x coefficient
     sb $t4, 0($s2)                         # Store y coefficient
     sb $t5, 0($s3)                         # Store z coefficient
-    sb $t6, 0($s4)                         # Store result
+    sb $t1, 0($s4)                         # Store result
     addi $s1, $s1, 1                       # Advance x array pointer
     addi $s2, $s2, 1                       # Advance y array pointer
     addi $s3, $s3, 1                       # Advance z array pointer
@@ -567,27 +567,27 @@ store_coefficients:
 # Output: Nicely formatted system equations
 print_systems:
     la $t7, coeff_array_x                  # Pointer to x coefficients
-    la $t1, coeff_array_y                  # Pointer to y coefficients
+    la $t6, coeff_array_y                  # Pointer to y coefficients
     la $t2, coeff_array_z                  # Pointer to z coefficients
     la $t3, results_array                  # Pointer to results
     la $t4, system_type_array              # Pointer to system types
     lb $t5, system_counter                 # Load total number of systems
-    li $t6, 0                              # System index starts at 1
+    li $t1, 0                              # System index starts at 1
 
     subi $t7, $t7, 1
-    subi $t1, $t1, 1
+    subi $t6, $t6, 1
     subi $t2, $t2, 1
     subi $t3, $t3, 1
     subi $t4, $t4, 1
 print_systems_loop:
     addi $t7, $t7, 1
-    addi $t1, $t1, 1
+    addi $t6, $t6, 1
     addi $t2, $t2, 1
     addi $t3, $t3, 1
     addi $t4, $t4, 1
     
-    bge $t6, $t5, print_systems_done
-    addiu $t6, $t6, 1
+    bge $t1, $t5, print_systems_done
+    addiu $t1, $t1, 1
     li $t8, 0
     
     la $a0, label_system
@@ -595,7 +595,7 @@ print_systems_loop:
     syscall
     
     li $v0, 1
-    move $a0, $t6
+    move $a0, $t1
     syscall
     
     li $v0, 4
@@ -626,7 +626,7 @@ print_3x:
     la $a0, space_str
     syscall
     
-    lb $t9, 0($t1)
+    lb $t9, 0($t6)
     beq $t9, 1, print_3y
     move $a0, $t9
     li $v0, 1
@@ -668,7 +668,7 @@ print_3z:
     syscall
     beq $t8, 3, print_systems_loop
     addiu $t7, $t7, 1
-    addiu $t1, $t1, 1
+    addiu $t6, $t6, 1
     addiu $t2, $t2, 1
     addiu $t3, $t3, 1
     j print_three_vars
@@ -694,7 +694,7 @@ print_2x:
     la $a0, space_str
     syscall
     
-    lb $t9, 0($t1)
+    lb $t9, 0($t6)
     beq $t9, 1, print_2y
     move $a0, $t9
     li $v0, 1
@@ -717,7 +717,7 @@ print_2y:
     
     beq $t8, 2, print_systems_loop
     addiu $t7, $t7, 1
-    addiu $t1, $t1, 1
+    addiu $t6, $t6, 1
     addiu $t2, $t2, 1
     addiu $t3, $t3, 1
     j print_two_vars
@@ -852,7 +852,7 @@ extract_three_var_answers:
     li $a0, 'X'
     PRINT_VAR_RES $a0, $a1
     
-    lw $t1, det_a
+    lw $t6, det_a
     lw $t7, det_a1
     
     jal division 
@@ -883,7 +883,7 @@ extract_three_var_answers:
     li $a0, 'Y'
     PRINT_VAR_RES $a0, $a1
     
-    lw $t1, det_a
+    lw $t6, det_a
     lw $t7, det_a2
     
     jal division 
@@ -915,7 +915,7 @@ extract_three_var_answers:
     li $a0, 'Z'
     PRINT_VAR_RES $a0, $a1
     
-    lw $t1, det_a
+    lw $t6, det_a
     lw $t7, det_a3
     
     jal division 
@@ -953,7 +953,7 @@ extract_two_var_answers:
     li $a0, 'X'
     PRINT_VAR_RES $a0, $a1
     
-    lw $t1, det_a
+    lw $t6, det_a
     lw $t7, det_a1
     
     jal division 
@@ -984,7 +984,7 @@ extract_two_var_answers:
     li $a0, 'Y'
     PRINT_VAR_RES $a0, $a1
     
-    lw $t1, det_a
+    lw $t6, det_a
     lw $t7, det_a2
     
     jal division 
@@ -1042,16 +1042,16 @@ no_print_needed:
     jr $ra
 
 # Function to do division
-# Input: $t7 = dividend, $t1 = divisor
+# Input: $t7 = dividend, $t6 = divisor
 # Output:
 #   $v0 = numerator (or integer result if exact division)
 #   $v1 = denominator (0 if exact division)
 division:
     move $t8, $ra           # Save return address
-    beqz $t1, division_by_zero_error  # Check for division by zero
+    beqz $t6, division_by_zero_error  # Check for division by zero
     
     # Perform division to check if the result is exact
-    div $t7, $t1
+    div $t7, $t6
     
     mfhi $t2                # Get the remainder
     mflo $v0                # Get the quotient
@@ -1060,8 +1060,8 @@ division:
 
     # Handle fractional division
     move $v0, $t7           # Numerator
-    move $v1, $t1           # Denominator
-    move $t5, $t1
+    move $v1, $t6           # Denominator
+    move $t5, $t6
     # Compute GCD of numerator and denominator
     jal gcd                 # Call GCD procedure
     move $ra, $t8           # Restore return address
@@ -1090,14 +1090,14 @@ division_by_zero_error:
 # Output: $v1 = GCD of numerator and denominator
 gcd:
     move $t7, $v0           # Copy numerator to $t7
-    move $t1, $v1           # Copy denominator to $t1
+    move $t6, $v1           # Copy denominator to $t6
 
 gcd_loop:
-    beqz $t1, gcd_done      # If $t1 is 0, GCD is in $t7
-    div $t7, $t1
+    beqz $t6, gcd_done      # If $t6 is 0, GCD is in $t7
+    div $t7, $t6
     mfhi $t2                # Get the remainder
-    move $t7, $t1           # $t7 = $t1
-    move $t1, $t2           # $t1 = remainder
+    move $t7, $t6           # $t7 = $t6
+    move $t6, $t2           # $t6 = remainder
     j gcd_loop
 
 gcd_done:
@@ -1114,7 +1114,7 @@ determinant_3x3:
     
     lb $t7, 0($s0)
     
-    lb $t1, 1($s1)
+    lb $t6, 1($s1)
     lb $t2, 1($s2)
     lb $t3, 2($s1)
     lb $t4, 2($s2)
@@ -1122,12 +1122,12 @@ determinant_3x3:
     jal determinant_2x2_3x3
     move $ra, $k1
     
-    mult $t7, $t1
+    mult $t7, $t6
     mflo $t0        
     
     lb $t7, 0($s1)
     
-    lb $t1, 1($s0)
+    lb $t6, 1($s0)
     lb $t2, 1($s2)
     lb $t3, 2($s0)
     lb $t4, 2($s2)
@@ -1135,12 +1135,12 @@ determinant_3x3:
     jal determinant_2x2_3x3
     move $ra, $k1
     
-    mult $t7, $t1
+    mult $t7, $t6
     mflo $t8
     
     lb $t7, 0($s2)
     
-    lb $t1, 1($s0)
+    lb $t6, 1($s0)
     lb $t2, 1($s1)
     lb $t3, 2($s0)
     lb $t4, 2($s1)
@@ -1148,7 +1148,7 @@ determinant_3x3:
     jal determinant_2x2_3x3
     move $ra, $k1
     
-    mult $t7, $t1
+    mult $t7, $t6
     mflo $t9
     
     sub $v0, $t0, $t8
@@ -1156,15 +1156,15 @@ determinant_3x3:
     
     jr $ra             # Return to caller
 
-# $t1   $t2 
+# $t6   $t2 
 # $t3   $t4
 determinant_2x2_3x3:
-    mult $t1, $t4
+    mult $t6, $t4
     mflo $t5
     mult $t3, $t2
-    mflo $t6
+    mflo $t1
     
-    sub $t1, $t5, $t6
+    sub $t6, $t5, $t1
     jr $ra
 
 # Function to calculate determinant for 2x2 matrix
@@ -1173,17 +1173,17 @@ determinant_2x2_3x3:
 determinant_2x2:
     
     lb $t7, 0($s0)
-    lb $t1, 0($s1)
+    lb $t6, 0($s1)
     lb $t2, 1($s0)
     lb $t3, 1($s1)
     
     mult $t7, $t3
     mflo $t7
     
-    mult $t1, $t2
-    mflo $t1
+    mult $t6, $t2
+    mflo $t6
     
-    sub $v0, $t7, $t1
+    sub $v0, $t7, $t6
     
     jr $ra
 
@@ -1198,7 +1198,7 @@ loop_reset:
     beqz $t8, reset_string_done
     sb $zero, 0($a2)
     addiu $a2, $a2, 1
-    addiu $t6, $t6, 1
+    addiu $t1, $t1, 1
 reset_string_done:
     jr $ra
 
@@ -1227,7 +1227,7 @@ copy_string:
 # Output: The integer is converted to a string at the address in $a2
 parse_integer:
     move $t7, $v0           # Copy the input integer to $t7
-    li $t1, 0               # Initialize digit counter
+    li $t6, 0               # Initialize digit counter
     li $t2, 0               # Flag for negative number (0 = positive, 1 = negative)
 
     # Handle negative numbers
@@ -1241,7 +1241,7 @@ convert_integer:
     sb $t3, 0($a2)          # Store the digit as a character
     addiu $a2, $a2, 1       # Move pointer forward in the buffer
     mflo $t7                # Update $t7 with the quotient
-    addiu $t1, $t1, 1       # Increment digit counter
+    addiu $t6, $t6, 1       # Increment digit counter
     bnez $t7, convert_integer # Repeat until $t7 becomes zero
 
     # Handle negative number case
@@ -1260,7 +1260,7 @@ add_minus_sign:
 
 finalize_string:
     sb $zero, 0($a2)        # Null-terminate the string
-    sub $a2, $a2, $t1       # Move pointer back to the start of the string
+    sub $a2, $a2, $t6       # Move pointer back to the start of the string
     bnez $t2, adjust_pointer # Adjust for negative sign if present
     jr $ra                  # Return to the caller
 
