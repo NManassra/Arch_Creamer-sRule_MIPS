@@ -264,8 +264,8 @@ trim_loop:
 end_trim:
     addi $t7, $t7, -1              # Go back one position to the last character
     lb $t6, 0($t7)                 # Load the last character
-    li $t2, 10                     # ASCII value for newline character
-    bne $t6, $t2, trim_done        # If it's not a newline, we're done
+    li $t5, 10                     # ASCII value for newline character
+    bne $t6, $t5, trim_done        # If it's not a newline, we're done
     sb $zero, 0($t7)               # Replace newline with null terminator if found
 
 trim_done:
@@ -398,10 +398,10 @@ validate_and_parse_line:
     sb $zero, equals_read                  # Clear equals_read flag
     li $t3, 0                              # Coefficient for x
     li $t4, 0                              # Coefficient for y
-    li $t5, 0                              # Coefficient for z
+    li $t2, 0                              # Coefficient for z
     li $t1, 0                              # Result (right-hand side of equation)
     li $t0, 1                              # Default sign positive
-    xor $t2, $t2, $t2                      # Clear current coefficient accumulator
+    xor $t5, $t5, $t5                      # Clear current coefficient accumulator
 
 parse_terms:
     lb $t8, 0($a0)                         # Load next character
@@ -461,51 +461,51 @@ check_digit_end:
 
 process_digit:
     sub $t8, $t8, '0'                      # Convert ASCII to integer
-    mul $t2, $t2, 10                       # Shift previous value in $t2 by multiplying by 10
-    add $t2, $t2, $t8                      # Add the new digit to $t2
+    mul $t5, $t5, 10                       # Shift previous value in $t5 by multiplying by 10
+    add $t5, $t5, $t8                      # Add the new digit to $t5
     j next_term
 
 check_x:
     lb $t9, x_read                         # Check if x has already been read
     bne $t9, $zero, format_error           # If x already read, format error
     sb $t0, x_read                         # Mark x as read
-    beqz $t2, set_default_x                # If no value accumulated, default to 1
-    mul $t3, $t2, $t0                      # Store coefficient for x
+    beqz $t5, set_default_x                # If no value accumulated, default to 1
+    mul $t3, $t5, $t0                      # Store coefficient for x
     j reset_accumulator
 
 check_y:
     lb $t9, y_read                         # Check if y has already been read
     bne $t9, $zero, format_error           # If y already read, format error
     sb $t0, y_read                         # Mark y as read
-    beqz $t2, set_default_y                # If no value accumulated, default to 1
-    mul $t4, $t2, $t0                      # Store coefficient for y
+    beqz $t5, set_default_y                # If no value accumulated, default to 1
+    mul $t4, $t5, $t0                      # Store coefficient for y
     j reset_accumulator
 
 check_z:
     lb $t9, z_read                         # Check if z has already been read
     bne $t9, $zero, format_error           # If z already read, format error
     sb $t0, z_read                         # Mark z as read
-    beqz $t2, set_default_z                # If no value accumulated, default to 1
-    mul $t5, $t2, $t0                      # Store coefficient for z
+    beqz $t5, set_default_z                # If no value accumulated, default to 1
+    mul $t2, $t5, $t0                      # Store coefficient for z
     j reset_accumulator
 
 set_default_x:
-    li $t2, 1                              # Default coefficient is 1
-    mul $t3, $t2, $t0                      # Apply the sign and set the coefficient
+    li $t5, 1                              # Default coefficient is 1
+    mul $t3, $t5, $t0                      # Apply the sign and set the coefficient
     j reset_accumulator
 
 set_default_y:
-    li $t2, 1                              # Default coefficient is 1
-    mul $t4, $t2, $t0                      # Apply the sign and set the coefficient
+    li $t5, 1                              # Default coefficient is 1
+    mul $t4, $t5, $t0                      # Apply the sign and set the coefficient
     j reset_accumulator
     
 set_default_z:
-    li $t2, 1                              # Default coefficient is 1
-    mul $t5, $t2, $t0                      # Apply the sign and set the coefficient
+    li $t5, 1                              # Default coefficient is 1
+    mul $t2, $t5, $t0                      # Apply the sign and set the coefficient
     j reset_accumulator
     
 reset_accumulator:
-    xor $t2, $t2, $t2                      # Clear accumulator
+    xor $t5, $t5, $t5                      # Clear accumulator
     li $t0, 1                              # Reset sign
     j next_term
 
@@ -513,7 +513,7 @@ check_equals:
     lb $t9, equals_read                    # Check if equals has already been read
     bne $t9, $zero, format_error           # If equals already read, format error
     sb $t0, equals_read                    # Mark equals as read
-    xor $t2, $t2, $t2                      # Clear accumulator
+    xor $t5, $t5, $t5                      # Clear accumulator
     li $t0, 1                              # Reset sign
     j next_term
 
@@ -529,7 +529,7 @@ next_term:
     j parse_terms
 
 validate_store:
-    mul $t1, $t2, $t0
+    mul $t1, $t5, $t0
     # Validate that x and y are present
     lb $t8, x_read
     beqz $t8, format_error                 # If x is missing, format error
@@ -553,7 +553,7 @@ store_three_var:
 store_coefficients:
     sb $t3, 0($s1)                         # Store x coefficient
     sb $t4, 0($s2)                         # Store y coefficient
-    sb $t5, 0($s3)                         # Store z coefficient
+    sb $t2, 0($s3)                         # Store z coefficient
     sb $t1, 0($s4)                         # Store result
     addi $s1, $s1, 1                       # Advance x array pointer
     addi $s2, $s2, 1                       # Advance y array pointer
@@ -568,25 +568,25 @@ store_coefficients:
 print_systems:
     la $t7, coeff_array_x                  # Pointer to x coefficients
     la $t6, coeff_array_y                  # Pointer to y coefficients
-    la $t2, coeff_array_z                  # Pointer to z coefficients
+    la $t5, coeff_array_z                  # Pointer to z coefficients
     la $t3, results_array                  # Pointer to results
     la $t4, system_type_array              # Pointer to system types
-    lb $t5, system_counter                 # Load total number of systems
+    lb $t2, system_counter                 # Load total number of systems
     li $t1, 0                              # System index starts at 1
 
     subi $t7, $t7, 1
     subi $t6, $t6, 1
-    subi $t2, $t2, 1
+    subi $t5, $t5, 1
     subi $t3, $t3, 1
     subi $t4, $t4, 1
 print_systems_loop:
     addi $t7, $t7, 1
     addi $t6, $t6, 1
-    addi $t2, $t2, 1
+    addi $t5, $t5, 1
     addi $t3, $t3, 1
     addi $t4, $t4, 1
     
-    bge $t1, $t5, print_systems_done
+    bge $t1, $t2, print_systems_done
     addiu $t1, $t1, 1
     li $t8, 0
     
@@ -645,7 +645,7 @@ print_3y:
     la $a0, space_str
     syscall
     
-    lb $t9, 0($t2)
+    lb $t9, 0($t5)
     beq $t9, 1, print_3z
     move $a0, $t9
     li $v0, 1
@@ -669,7 +669,7 @@ print_3z:
     beq $t8, 3, print_systems_loop
     addiu $t7, $t7, 1
     addiu $t6, $t6, 1
-    addiu $t2, $t2, 1
+    addiu $t5, $t5, 1
     addiu $t3, $t3, 1
     j print_three_vars
 
@@ -718,7 +718,7 @@ print_2y:
     beq $t8, 2, print_systems_loop
     addiu $t7, $t7, 1
     addiu $t6, $t6, 1
-    addiu $t2, $t2, 1
+    addiu $t5, $t5, 1
     addiu $t3, $t3, 1
     j print_two_vars
 
@@ -1053,15 +1053,15 @@ division:
     # Perform division to check if the result is exact
     div $t7, $t6
     
-    mfhi $t2                # Get the remainder
+    mfhi $t5                # Get the remainder
     mflo $v0                # Get the quotient
     
-    beqz $t2, exact_division # If remainder is 0, it's an exact division
+    beqz $t5, exact_division # If remainder is 0, it's an exact division
 
     # Handle fractional division
     move $v0, $t7           # Numerator
     move $v1, $t6           # Denominator
-    move $t5, $t6
+    move $t2, $t6
     # Compute GCD of numerator and denominator
     jal gcd                 # Call GCD procedure
     move $ra, $t8           # Restore return address
@@ -1069,7 +1069,7 @@ division:
     # Simplify the fraction
     div $v0, $v0, $v1       # Divide numerator by GCD
     mflo $v0
-    div $v1, $t5, $v1       # Divide denominator by GCD
+    div $v1, $t2, $v1       # Divide denominator by GCD
     mflo $v1
     jr $ra                  # Return to the caller
 
@@ -1095,9 +1095,9 @@ gcd:
 gcd_loop:
     beqz $t6, gcd_done      # If $t6 is 0, GCD is in $t7
     div $t7, $t6
-    mfhi $t2                # Get the remainder
+    mfhi $t5                # Get the remainder
     move $t7, $t6           # $t7 = $t6
-    move $t6, $t2           # $t6 = remainder
+    move $t6, $t5           # $t6 = remainder
     j gcd_loop
 
 gcd_done:
@@ -1115,7 +1115,7 @@ determinant_3x3:
     lb $t7, 0($s0)
     
     lb $t6, 1($s1)
-    lb $t2, 1($s2)
+    lb $t5, 1($s2)
     lb $t3, 2($s1)
     lb $t4, 2($s2)
     
@@ -1128,7 +1128,7 @@ determinant_3x3:
     lb $t7, 0($s1)
     
     lb $t6, 1($s0)
-    lb $t2, 1($s2)
+    lb $t5, 1($s2)
     lb $t3, 2($s0)
     lb $t4, 2($s2)
     
@@ -1141,7 +1141,7 @@ determinant_3x3:
     lb $t7, 0($s2)
     
     lb $t6, 1($s0)
-    lb $t2, 1($s1)
+    lb $t5, 1($s1)
     lb $t3, 2($s0)
     lb $t4, 2($s1)
     
@@ -1156,15 +1156,15 @@ determinant_3x3:
     
     jr $ra             # Return to caller
 
-# $t6   $t2 
+# $t6   $t5 
 # $t3   $t4
 determinant_2x2_3x3:
     mult $t6, $t4
-    mflo $t5
-    mult $t3, $t2
+    mflo $t2
+    mult $t3, $t5
     mflo $t1
     
-    sub $t6, $t5, $t1
+    sub $t6, $t2, $t1
     jr $ra
 
 # Function to calculate determinant for 2x2 matrix
@@ -1174,13 +1174,13 @@ determinant_2x2:
     
     lb $t7, 0($s0)
     lb $t6, 0($s1)
-    lb $t2, 1($s0)
+    lb $t5, 1($s0)
     lb $t3, 1($s1)
     
     mult $t7, $t3
     mflo $t7
     
-    mult $t6, $t2
+    mult $t6, $t5
     mflo $t6
     
     sub $v0, $t7, $t6
@@ -1228,7 +1228,7 @@ copy_string:
 parse_integer:
     move $t7, $v0           # Copy the input integer to $t7
     li $t6, 0               # Initialize digit counter
-    li $t2, 0               # Flag for negative number (0 = positive, 1 = negative)
+    li $t5, 0               # Flag for negative number (0 = positive, 1 = negative)
 
     # Handle negative numbers
     bltz $t7, handle_negative
@@ -1245,11 +1245,11 @@ convert_integer:
     bnez $t7, convert_integer # Repeat until $t7 becomes zero
 
     # Handle negative number case
-    bnez $t2, add_minus_sign
+    bnez $t5, add_minus_sign
     j finalize_string
 
 handle_negative:
-    li $t2, 1               # Set negative flag
+    li $t5, 1               # Set negative flag
     subu $t7, $zero, $t7    # Make the number positive
     j convert_integer
 
@@ -1261,7 +1261,7 @@ add_minus_sign:
 finalize_string:
     sb $zero, 0($a2)        # Null-terminate the string
     sub $a2, $a2, $t6       # Move pointer back to the start of the string
-    bnez $t2, adjust_pointer # Adjust for negative sign if present
+    bnez $t5, adjust_pointer # Adjust for negative sign if present
     jr $ra                  # Return to the caller
 
 adjust_pointer:
