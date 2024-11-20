@@ -334,7 +334,7 @@ parse_systems:
     la $s0, coeff_array_x                  # Initialize pointer to coefficient x array
     la $s7, coeff_array_y                  # Initialize pointer to coefficient y array
     la $s5, coeff_array_z                  # Initialize pointer to coefficient z array
-    la $s4, results_array                  # Initialize pointer to results array
+    la $s6, results_array                  # Initialize pointer to results array
     la $s3, system_type_array              # Initialize pointer to system types array
     li $t0, 0                              # Reset equation counter
     xor $t1, $t1, $t1                      # Clear z_read flag
@@ -554,11 +554,11 @@ store_coefficients:
     sb $t3, 0($s0)                         # Store x coefficient
     sb $t4, 0($s7)                         # Store y coefficient
     sb $t5, 0($s5)                         # Store z coefficient
-    sb $t6, 0($s4)                         # Store result
+    sb $t6, 0($s6)                         # Store result
     addi $s0, $s0, 1                       # Advance x array pointer
     addi $s7, $s7, 1                       # Advance y array pointer
     addi $s5, $s5, 1                       # Advance z array pointer
-    addi $s4, $s4, 1                       # Advance results array pointer
+    addi $s6, $s6, 1                       # Advance results array pointer
     jr $ra                                 # Return to caller
     
  
@@ -731,7 +731,7 @@ solve_systems:
     la $s0, coeff_array_y                  # Initialize pointer to coefficient y array
     la $s7, coeff_array_z                  # Initialize pointer to coefficient z array
     la $s5, results_array                  # Initialize pointer to results array
-    la $s4, system_type_array              # Initialize pointer to system types array
+    la $s6, system_type_array              # Initialize pointer to system types array
     la $a1, output_buffer
     li $s3, 0
 check_system:
@@ -740,7 +740,7 @@ check_system:
     bge $s3, $k1, solving_done
     addiu $s3, $s3, 1
     
-    lb $t0, 0($s4)
+    lb $t0, 0($s6)
     beq $t0, 0, solve_two_vars
     
 solve_three_vars:
@@ -796,7 +796,7 @@ solve_three_vars:
     addiu $s0, $s0, 3
     addiu $s7, $s7, 3
     addiu $s5, $s5, 3
-    addiu $s4, $s4, 1
+    addiu $s6, $s6, 1
     
     j check_system
   
@@ -840,7 +840,7 @@ solve_two_vars:
     addiu $s0, $s0, 2
     addiu $s7, $s7, 2
     addiu $s5, $s5, 2
-    addiu $s4, $s4, 1
+    addiu $s6, $s6, 1
     j check_system
 
 solving_done:
@@ -1286,7 +1286,7 @@ counting_done:
     jr $ra
 
 refresh:
-    move $s6, $ra
+    move $s4, $ra
     
     la $a2, input_filename
     jal string_reset
@@ -1301,4 +1301,4 @@ refresh:
     sb $t0, 0($a0)
     sb $t0, system_counter
     
-    jr $s6
+    jr $s4
